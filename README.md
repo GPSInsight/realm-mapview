@@ -1,5 +1,10 @@
 ## A Cluster Manager implementation for Realm
 
+## Demo
+
+![Demo](https://raw.githubusercontent.com/GPSInsight/realm-mapview/master/extras/demo.gif)
+
+
 ### Usage
 
 ```java
