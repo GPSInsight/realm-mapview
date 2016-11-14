@@ -1,28 +1,36 @@
 package io.realm;
 
 import android.content.Context;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.maps.android.MarkerManager;
+import com.google.maps.android.clustering.ClusterItem;
 import com.google.maps.android.clustering.ClusterManager;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
-
-import io.realm.internal.RealmObjectProxy;
-import io.realm.internal.Row;
-import io.realm.internal.Table;
 
 /**
- * An implementation of the {@link ClusterManager} that handles processing a {@link RealmResults}
- * list and lookup of the respective columnName/Index to query the lat/long in order to store them
- * in the {@link RealmClusterWrapper}.
+ * Created by Reline on 11/13/16.
+ * An implementation of the {@link ClusterManager} that handles processing an {@link OrderedRealmCollection}.
  */
-public class RealmClusterManager<M extends RealmObject>
-        extends ClusterManager<RealmClusterWrapper<M>> {
+public class RealmClusterManager<T extends RealmObject & ClusterItem> extends ClusterManager<T> {
 
-    private long titleColumnIndex = -1;
+    private OrderedRealmCollection<T> items;
+
+    private RealmChangeListener listener = new RealmChangeListener() {
+        @Override
+        public void onChange(Object results) {
+            getAlgorithm().clearItems();
+            if (results instanceof OrderedRealmCollection) {
+                Realm realm = Realm.getDefaultInstance();
+                getAlgorithm().addItems(realm.copyFromRealm(items));
+                realm.close();
+            }
+            cluster();
+        }
+    };
 
     public RealmClusterManager(Context context, GoogleMap map) {
         super(context, map);
@@ -33,62 +41,60 @@ public class RealmClusterManager<M extends RealmObject>
     }
 
     @Override
-    public void addItems(Collection<RealmClusterWrapper<M>> items) {
-        throw new IllegalStateException("Use updateRealmResults instead");
+    @Deprecated
+    public void addItems(Collection<T> items) {
+        throw new UnsupportedOperationException("This method is not supported by RealmClusterManager. Use updateRealmResults instead.");
     }
 
     @Override
-    public void addItem(RealmClusterWrapper<M> myItem) {
-        throw new IllegalStateException("Use addRealmResultItems instead");
+    @Deprecated
+    public void addItem(T myItem) {
+        throw new UnsupportedOperationException("This method is not supported by RealmClusterManager. Use updateRealmResults instead.");
     }
 
-    public void updateRealmResults(
-            RealmResults<M> realmResults,
-            String titleColumnName,
-            String latitudeColumnName,
-            String longitudeColumnName) {
+    public void updateData(@Nullable OrderedRealmCollection<T> data) {
+        if (data != null && !data.isManaged())
+            throw new IllegalStateException("Only use this manager with managed list");
+
+        if (items != null) {
+            removeListener(items);
+        }
+        this.items = data;
+        if (items != null) {
+            addListener(items);
+        }
+
         super.clearItems();
-        final Table table = realmResults.getTable().getTable();
-
-        titleColumnIndex = table.getColumnIndex(titleColumnName);
-        if (titleColumnIndex == Table.NO_MATCH) {
-            throw new IllegalStateException("titleColumnName not valid.");
-        }
-        long latIndex = table.getColumnIndex(latitudeColumnName);
-        if (latIndex == Table.NO_MATCH) {
-            throw new IllegalStateException("latitudeColumnName not valid.");
-        }
-        long longIndex = table.getColumnIndex(longitudeColumnName);
-        if (longIndex == Table.NO_MATCH) {
-            throw new IllegalStateException("longitudeColumnName not valid.");
-        }
-
-        List<RealmClusterWrapper<M>> wrappedItems = new ArrayList<>(realmResults.size());
-        for (int i = 0; i < realmResults.size(); i++) {
-            M realmResult = realmResults.get(i);
-            Row row = ((RealmObjectProxy) realmResult).realmGet$proxyState().getRow$realm();
-            RealmClusterWrapper<M> wrappedItem = new RealmClusterWrapper<>(
-                    realmResult,
-                    getTitle(row, titleColumnIndex),
-                    getValue(row, table.getColumnType(latIndex), latIndex),
-                    getValue(row, table.getColumnType(longIndex), longIndex));
-            wrappedItems.add(wrappedItem);
-        }
-        super.addItems(wrappedItems);
+        Realm realm = Realm.getDefaultInstance();
+        super.addItems(realm.copyFromRealm(items));
+        realm.close();
+        super.cluster();
     }
 
-    private double getValue(Row row, RealmFieldType columnType, long columnIndex) {
-        if (columnType == RealmFieldType.DOUBLE) {
-            return row.getDouble(columnIndex);
-        } else if (columnType == RealmFieldType.FLOAT) {
-            return row.getFloat(columnIndex);
-        } else if (columnType == RealmFieldType.INTEGER) {
-            return row.getLong(columnIndex);
+    private void addListener(@NonNull OrderedRealmCollection<T> data) {
+        if (data instanceof RealmResults) {
+            RealmResults realmResults = (RealmResults) data;
+            //noinspection unchecked
+            realmResults.addChangeListener(listener);
+        } else if (data instanceof RealmList) {
+            RealmList realmList = (RealmList) data;
+            //noinspection unchecked
+            realmList.realm.handlerController.addChangeListenerAsWeakReference(listener);
+        } else {
+            throw new IllegalArgumentException("RealmCollection not supported: " + data.getClass());
         }
-        throw new IllegalStateException("The value type needs to be of double, float or int");
     }
 
-    public String getTitle(Row row, long columnIndex) {
-        return row.getString(columnIndex);
+    private void removeListener(@NonNull OrderedRealmCollection<T> data) {
+        if (data instanceof RealmResults) {
+            RealmResults realmResults = (RealmResults) data;
+            realmResults.removeChangeListener(listener);
+        } else if (data instanceof RealmList) {
+            RealmList realmList = (RealmList) data;
+            //noinspection unchecked
+            realmList.realm.handlerController.removeWeakChangeListener(listener);
+        } else {
+            throw new IllegalArgumentException("RealmCollection not supported: " + data.getClass());
+        }
     }
 }

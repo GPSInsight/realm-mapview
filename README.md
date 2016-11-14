@@ -1,68 +1,15 @@
-## A MapView that is powered by Realm
+## A Cluster Manager implementation for Realm
 
-A simple, yet powerful wrapper around the `SupportMapFragment` with support for clustering and built-in support for querying and rendering a Realm results.
+### Usage
 
-##How To Include It:
-
-```
-	repositories {
-        // ...
-        maven { url "https://jitpack.io" }
-    }
+```java
+RealmClusterManager<MyClusterItem> manager = new RealmClusterManager<>(context, googleMap);
+manager.updateData(realm.where(MyClusterItem.class).findAll());
 ```
 
-```
-	dependencies {
-	        compile 'com.github.thorbenprimke:realm-mapview:0.9.2'
-	}
-```
+Be sure to keep a reference to the `RealmClusterManager` while the `GoogleMap` is in use, otherwise you'll lose out on automatic updates.
 
-##Demo
-
-![Screenshot](https://raw.githubusercontent.com/thorbenprimke/realm-mapview/master/extra/screenshot-demo-app.gif)
-
-## How To Get Started:
-
-Using the `RealmClusterMapFragment` is as simple as extending it and implementing three methods. The following is an example:
-
-```
-public class BusinessRealmClusterMapFragment extends
-    RealmClusterMapFragment<Business> {
-
-    @Override
-    protected String getTitleColumnName() {
-        return "name";
-    }
-
-    @Override
-    protected String getLatitudeColumnName() {
-        return "latitude";
-    }
-
-    @Override
-    protected String getLongitudeColumnName() {
-        return "longitude";
-    }
-}
-```
-
-The fragment loads data from the Realm of type `Business` and the provided columnNames are used to look up the latitude, longitude and the marker's title.
-
-All that's left at this point, is to include the fragment in your Activity's layout file or create it programmatically.
-
-##Other:
-
-Your projects's `AndroidManifest` has to include the following valid Map V2 key. You can obtain a key from [Google Developer Console](https://developers.google.com/maps/documentation/android-api/)
-
-```
-<meta-data
-    android:name="com.google.android.maps.v2.API_KEY"
-    android:value="YOUR_KEY"/>
-```
-
-##Feedback/More Features:
-I would love to hear your feedback. Do you find the ```RealmClusterMapFragment``` useful? What functionality are you missing? Open a ```Github``` issue and let me know. Thanks!
-
+Look at the example application or create an issue if you have any questions or improvements you'd like to add.
 
 ## License
 ```
